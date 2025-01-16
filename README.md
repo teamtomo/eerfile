@@ -6,7 +6,7 @@
 [![CI](https://github.com/alisterburt/eerfile/actions/workflows/ci.yml/badge.svg)](https://github.com/alisterburt/eerfile/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/alisterburt/eerfile/branch/main/graph/badge.svg)](https://codecov.io/gh/alisterburt/eerfile)
 
-Read electron event representation (EER) files in Python.
+Read electron event representation (EER) files as NumPy arrays in Python.
 
 ## Installation
 
