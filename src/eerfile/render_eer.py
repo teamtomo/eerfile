@@ -27,6 +27,7 @@ def render(
         Dose per output frame in rendered image in electrons per square angstrom.
     total_fluence: Optional[float]
         Total fluence in electrons per square angstrom.
+        If not specified, the fluence from the EER file header will be used.
 
     Returns
     -------
@@ -43,7 +44,7 @@ def render(
         dose_per_eer_frame = eer_header.dose_per_frame_electrons_per_square_angstrom
     else:
         dose_per_eer_frame = total_fluence / eer_header.n_frames
-    print(f"dose_per_eer_frame: {dose_per_eer_frame}")
+
     eer_frames_per_output_frame = round(dose_per_output_frame / dose_per_eer_frame)
     n_output_frames = floor(eer_header.n_frames / eer_frames_per_output_frame)
 
