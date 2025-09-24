@@ -23,10 +23,28 @@ import eerfile
 
 # render multi-frame micrograph from file and target dose per frame
 # dose per frame is in electrons per square angstrom
-image = eerfile.render("FoilHole_19622436.eer", dose_per_output_frame=1.0)
+image = eerfile.render("FoilHole_19622436.eer", dose_per_output_frame=1.0, total_fluence=50.0)
 
 # or you can read the entire stack of EER frames
 eer_frames = eerfile.read("FoilHole_19622436.eer")
+```
+
+### Memory-Efficient Rendering
+
+For large movies that may cause memory issues, you can specify a chunk size of the output frames to process frames in smaller batches:
+
+```python
+import eerfile
+
+# Memory-efficient rendering with chunking
+# Processes frames in chunks to avoid memory overflow
+image = eerfile.render(
+    "large_movie.eer", 
+    dose_per_output_frame=1.0,
+    total_fluence=50.0,
+    chunk_size=10      # Process 10 output frames at a time
+)
+
 ```
 
 ## Acknowledgements
