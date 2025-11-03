@@ -35,9 +35,8 @@ classifiers = [
 ]
 # add your package dependencies here
 dependencies = [
-    "tifffile",
+    "tifffile>=v2025.10.16",
     "imagecodecs",
-    "lxml",
     "numpy",
     "pydantic",
     "einops",

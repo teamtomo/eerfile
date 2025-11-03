@@ -4,7 +4,6 @@ import os
 from datetime import datetime
 from typing import Any
 
-from lxml import etree
 from pydantic import BaseModel
 
 
@@ -82,156 +81,98 @@ class EERHeader(BaseModel):
         """
         from tifffile import TiffFile
 
-        # define helper functions to safely extract XML data
-        def _find_xml_item(name: str) -> etree._Element | None:
-            return root.find(f"./item[@name='{name}']")
-
-        def _get_xml_text(name: str, default: str = "") -> str:
-            element = _find_xml_item(name)
-            return (
-                element.text
-                if element is not None and element.text is not None
-                else default
-            )
-
-        def _get_xml_float(name: str) -> float | None:
-            element = _find_xml_item(name)
-            if element is not None and element.text is not None:
-                try:
-                    return float(element.text)
-                except (ValueError, TypeError):
-                    return None
-            return None
-
-        def _get_xml_int(name: str) -> int:
-            element = _find_xml_item(name)
-            if element is not None and element.text is not None:
-                try:
-                    return int(element.text)
-                except (ValueError, TypeError):
-                    return 0
-            return 0
-
         with TiffFile(file) as tiff:
             metadata = tiff.eer_metadata
 
-            # Handle both dict and XML string/bytes
-            if isinstance(metadata, dict):
-                # Newer tifffile versions return a dict
-                # The dict might have items stored directly as keys,
-                # or as a list of items with 'name' attributes
-                def _get_dict_value(
-                    key_path: str, default: Any | None = None
-                ) -> Any | None:
-                    """Extract value from dict using key name or dot notation."""
-                    # First try direct key access (flat dict)
-                    if key_path in metadata:
-                        return metadata[key_path]
+            # Helper functions to extract values from dict metadata
+            def _get_dict_value(
+                key_path: str, default: Any | None = None
+            ) -> Any | None:
+                """Extract value from dict using key name or dot notation."""
+                # First try direct key access (flat dict)
+                if key_path in metadata:
+                    return metadata[key_path]
 
-                    # Try nested dict access (e.g., "sensorPixelSize.height")
-                    keys = key_path.split(".")
-                    value: Any | None = metadata
-                    for key in keys:
-                        if isinstance(value, dict):
-                            value = value.get(key)
-                            if value is None:
-                                break
-                        else:
-                            value = None
+                # Try nested dict access (e.g., "sensorPixelSize.height")
+                keys = key_path.split(".")
+                value: Any | None = metadata
+                for key in keys:
+                    if isinstance(value, dict):
+                        value = value.get(key)
+                        if value is None:
                             break
-                    if value is not None:
-                        return value
+                    else:
+                        value = None
+                        break
+                if value is not None:
+                    return value
 
-                    # Try list of items structure (like XML items)
-                    # For nested keys, check both the full path
-                    # and the base key (sensorPixelSize)
-                    base_key = keys[0] if keys else key_path
-                    if "items" in metadata or isinstance(metadata.get("item"), list):
-                        items = metadata.get("items", metadata.get("item", []))
-                        for item in items:
-                            if isinstance(item, dict):
-                                item_name = item.get("name")
-                                # Match exact key or base key for nested paths
-                                if item_name == key_path or item_name == base_key:
-                                    # For nested keys, try to access the nested value
-                                    if len(keys) > 1 and isinstance(
-                                        item.get("value"), dict
-                                    ):
-                                        nested_value = item.get("value")
-                                        for sub_key in keys[1:]:
-                                            if isinstance(nested_value, dict):
-                                                nested_value = nested_value.get(sub_key)
-                                            else:
-                                                nested_value = None
-                                                break
-                                        if nested_value is not None:
-                                            return nested_value
-                                    return item.get("value") or item.get("text")
+                # Try list of items structure (like XML items)
+                # For nested keys, check both the full path
+                # and the base key (sensorPixelSize)
+                base_key = keys[0] if keys else key_path
+                if "items" in metadata or isinstance(metadata.get("item"), list):
+                    items = metadata.get("items", metadata.get("item", []))
+                    for item in items:
+                        if isinstance(item, dict):
+                            item_name = item.get("name")
+                            # Match exact key or base key for nested paths
+                            if item_name == key_path or item_name == base_key:
+                                # For nested keys, try to access the nested value
+                                if len(keys) > 1 and isinstance(
+                                    item.get("value"), dict
+                                ):
+                                    nested_value = item.get("value")
+                                    for sub_key in keys[1:]:
+                                        if isinstance(nested_value, dict):
+                                            nested_value = nested_value.get(sub_key)
+                                        else:
+                                            nested_value = None
+                                            break
+                                    if nested_value is not None:
+                                        return nested_value
+                                return item.get("value") or item.get("text")
 
-                    return default
+                return default
 
-                def _get_dict_text(key_path: str, default: str = "") -> str:
-                    value = _get_dict_value(key_path, default)
-                    return str(value) if value is not None else default
+            def _get_dict_text(key_path: str, default: str = "") -> str:
+                value = _get_dict_value(key_path, default)
+                return str(value) if value is not None else default
 
-                def _get_dict_float(key_path: str) -> float | None:
-                    value = _get_dict_value(key_path)
-                    if value is not None:
-                        try:
-                            return float(value)
-                        except (ValueError, TypeError):
-                            return None
-                    return None
+            def _get_dict_float(key_path: str) -> float | None:
+                value = _get_dict_value(key_path)
+                if value is not None:
+                    try:
+                        return float(value)
+                    except (ValueError, TypeError):
+                        return None
+                return None
 
-                def _get_dict_int(key_path: str) -> int:
-                    value = _get_dict_value(key_path)
-                    if value is not None:
-                        try:
-                            return int(value)
-                        except (ValueError, TypeError):
-                            return 0
-                    return 0
+            def _get_dict_int(key_path: str) -> int:
+                value = _get_dict_value(key_path)
+                if value is not None:
+                    try:
+                        return int(value)
+                    except (ValueError, TypeError):
+                        return 0
+                return 0
 
-                # Extract values from dict
-                return cls(
-                    acquisition_id=_get_dict_text("acquisitionID"),
-                    camera_name=_get_dict_text("cameraName"),
-                    commercial_name=_get_dict_text("commercialName"),
-                    exposure_time_seconds=_get_dict_float("exposureTime"),
-                    dose_rate_electrons_per_pixel_per_second=_get_dict_float(
-                        "meanDoseRate"
-                    ),
-                    total_dose_electrons_per_pixel=_get_dict_float("totalDose"),
-                    n_frames=_get_dict_int("numberOfFrames"),
-                    image_height_pixels=_get_dict_int("sensorImageHeight"),
-                    image_width_pixels=_get_dict_int("sensorImageWidth"),
-                    pixel_spacing_height_meters=_get_dict_float(
-                        "sensorPixelSize.height"
-                    )
-                    or 0.0,
-                    pixel_spacing_width_meters=_get_dict_float("sensorPixelSize.width")
-                    or 0.0,
-                    serial_number=_get_dict_text("serialNumber"),
-                )
-            else:
-                # Older tifffile versions return XML string/bytes
-                root = etree.fromstring(metadata)
-
-                return cls(
-                    acquisition_id=_get_xml_text("acquisitionID"),
-                    camera_name=_get_xml_text("cameraName"),
-                    commercial_name=_get_xml_text("commercialName"),
-                    exposure_time_seconds=_get_xml_float("exposureTime"),
-                    dose_rate_electrons_per_pixel_per_second=_get_xml_float(
-                        "meanDoseRate"
-                    ),
-                    total_dose_electrons_per_pixel=_get_xml_float("totalDose"),
-                    n_frames=_get_xml_int("numberOfFrames"),
-                    image_height_pixels=_get_xml_int("sensorImageHeight"),
-                    image_width_pixels=_get_xml_int("sensorImageWidth"),
-                    pixel_spacing_height_meters=_get_xml_float("sensorPixelSize.height")
-                    or 0.0,
-                    pixel_spacing_width_meters=_get_xml_float("sensorPixelSize.width")
-                    or 0.0,
-                    serial_number=_get_xml_text("serialNumber"),
-                )
+            # Extract values from dict
+            return cls(
+                acquisition_id=_get_dict_text("acquisitionID"),
+                camera_name=_get_dict_text("cameraName"),
+                commercial_name=_get_dict_text("commercialName"),
+                exposure_time_seconds=_get_dict_float("exposureTime"),
+                dose_rate_electrons_per_pixel_per_second=_get_dict_float(
+                    "meanDoseRate"
+                ),
+                total_dose_electrons_per_pixel=_get_dict_float("totalDose"),
+                n_frames=_get_dict_int("numberOfFrames"),
+                image_height_pixels=_get_dict_int("sensorImageHeight"),
+                image_width_pixels=_get_dict_int("sensorImageWidth"),
+                pixel_spacing_height_meters=_get_dict_float("sensorPixelSize.height")
+                or 0.0,
+                pixel_spacing_width_meters=_get_dict_float("sensorPixelSize.width")
+                or 0.0,
+                serial_number=_get_dict_text("serialNumber"),
+            )
