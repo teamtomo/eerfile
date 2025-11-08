@@ -330,6 +330,58 @@ class TestEERHeader:
         assert header.image_height_pixels == 128
         assert header.image_width_pixels == 128
 
+    @patch("tifffile.TiffFile")
+    def test_eer_header_from_file_items_list_structure(self, mock_tiff_file):
+        """Test parsing EER header with items list structure (fallback case)."""
+        # Mock TiffFile with items list structure (like XML items)
+        mock_tiff = Mock()
+        mock_tiff.eer_metadata = {
+            "items": [
+                {"name": "acquisitionID", "value": "test_items_123"},
+                {"name": "cameraName", "value": "ItemsCamera"},
+                {"name": "numberOfFrames", "value": "75"},
+                {"name": "sensorImageHeight", "value": "384"},
+                {"name": "sensorImageWidth", "value": "384"},
+                {
+                    "name": "sensorPixelSize",
+                    "value": {"height": "3.0e-10", "width": "3.0e-10"},
+                },
+            ]
+        }
+        mock_tiff_file.return_value.__enter__.return_value = mock_tiff
+
+        header = EERHeader.from_file("test.eer")
+
+        assert header.acquisition_id == "test_items_123"
+        assert header.camera_name == "ItemsCamera"
+        assert header.n_frames == 75
+        assert header.image_height_pixels == 384
+        assert header.image_width_pixels == 384
+        assert header.pixel_spacing_height_meters == 3.0e-10
+        assert header.pixel_spacing_width_meters == 3.0e-10
+
+    @patch("tifffile.TiffFile")
+    def test_eer_header_from_file_items_list_with_text(self, mock_tiff_file):
+        """Test parsing EER header with items list using 'text' field."""
+        # Mock TiffFile with items list using 'text' instead of 'value'
+        mock_tiff = Mock()
+        mock_tiff.eer_metadata = {
+            "item": [
+                {"name": "acquisitionID", "text": "test_text_123"},
+                {"name": "numberOfFrames", "text": "25"},
+                {"name": "sensorImageHeight", "text": "200"},
+                {"name": "sensorImageWidth", "text": "200"},
+            ]
+        }
+        mock_tiff_file.return_value.__enter__.return_value = mock_tiff
+
+        header = EERHeader.from_file("test.eer")
+
+        assert header.acquisition_id == "test_text_123"
+        assert header.n_frames == 25
+        assert header.image_height_pixels == 200
+        assert header.image_width_pixels == 200
+
 
 class TestBasicFunctionality:
     """Test basic read and render functionality."""
