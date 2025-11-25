@@ -238,8 +238,153 @@ class TestRenderMemoryEfficient:
         mock_read_frames.assert_called()
 
 
-class TestBackwardCompatibility:
-    """Test that existing functionality still works."""
+class TestEERHeader:
+    """Test the EERHeader data model."""
+
+    @patch("tifffile.TiffFile")
+    def test_eer_header_from_file(self, mock_tiff_file):
+        """Test parsing EER header from file with dict metadata."""
+        # Mock TiffFile with dict metadata (newer tifffile format)
+        mock_tiff = Mock()
+        mock_tiff.eer_metadata = {
+            "acquisitionID": "test_acquisition_123",
+            "cameraName": "TestCamera",
+            "commercialName": "TestCommercial",
+            "exposureTime": "1.5",
+            "meanDoseRate": "2.5",
+            "totalDose": "10.0",
+            "numberOfFrames": "100",
+            "sensorImageHeight": "512",
+            "sensorImageWidth": "512",
+            "sensorPixelSize": {"height": "1.0e-10", "width": "1.0e-10"},
+            "serialNumber": "SN12345",
+        }
+        mock_tiff_file.return_value.__enter__.return_value = mock_tiff
+
+        header = EERHeader.from_file("test.eer")
+
+        assert header.acquisition_id == "test_acquisition_123"
+        assert header.camera_name == "TestCamera"
+        assert header.commercial_name == "TestCommercial"
+        assert header.exposure_time_seconds == 1.5
+        assert header.dose_rate_electrons_per_pixel_per_second == 2.5
+        assert header.total_dose_electrons_per_pixel == 10.0
+        assert header.n_frames == 100
+        assert header.image_height_pixels == 512
+        assert header.image_width_pixels == 512
+        assert header.pixel_spacing_height_meters == 1.0e-10
+        assert header.pixel_spacing_width_meters == 1.0e-10
+        assert header.serial_number == "SN12345"
+
+    @patch("tifffile.TiffFile")
+    def test_eer_header_from_file_nested_dict(self, mock_tiff_file):
+        """Test parsing EER header with nested dict structure."""
+        # Mock TiffFile with nested dict metadata
+        mock_tiff = Mock()
+        mock_tiff.eer_metadata = {
+            "acquisitionID": "test_123",
+            "numberOfFrames": "50",
+            "sensorImageHeight": "256",
+            "sensorImageWidth": "256",
+            "sensorPixelSize": {
+                "height": "2.0e-10",
+                "width": "2.0e-10",
+            },
+        }
+        mock_tiff_file.return_value.__enter__.return_value = mock_tiff
+
+        header = EERHeader.from_file("test.eer")
+
+        assert header.n_frames == 50
+        assert header.image_height_pixels == 256
+        assert header.image_width_pixels == 256
+        assert header.pixel_spacing_height_meters == 2.0e-10
+        assert header.pixel_spacing_width_meters == 2.0e-10
+
+    @patch("tifffile.TiffFile")
+    def test_eer_header_from_file_missing_fields(self, mock_tiff_file):
+        """Test parsing EER header with missing optional fields."""
+        # Mock TiffFile with minimal metadata
+        mock_tiff = Mock()
+        mock_tiff.eer_metadata = {
+            "numberOfFrames": "10",
+            "sensorImageHeight": "128",
+            "sensorImageWidth": "128",
+            "sensorPixelSize": {"height": "1.0e-10", "width": "1.0e-10"},
+        }
+        mock_tiff_file.return_value.__enter__.return_value = mock_tiff
+
+        header = EERHeader.from_file("test.eer")
+
+        # Required fields should have defaults
+        assert header.acquisition_id == ""
+        assert header.camera_name == ""
+        assert header.commercial_name == ""
+        assert header.serial_number == ""
+        # Optional fields should be None
+        assert header.exposure_time_seconds is None
+        assert header.dose_rate_electrons_per_pixel_per_second is None
+        assert header.total_dose_electrons_per_pixel is None
+        # Required fields should be set
+        assert header.n_frames == 10
+        assert header.image_height_pixels == 128
+        assert header.image_width_pixels == 128
+
+    @patch("tifffile.TiffFile")
+    def test_eer_header_from_file_items_list_structure(self, mock_tiff_file):
+        """Test parsing EER header with items list structure (fallback case)."""
+        # Mock TiffFile with items list structure (like XML items)
+        mock_tiff = Mock()
+        mock_tiff.eer_metadata = {
+            "items": [
+                {"name": "acquisitionID", "value": "test_items_123"},
+                {"name": "cameraName", "value": "ItemsCamera"},
+                {"name": "numberOfFrames", "value": "75"},
+                {"name": "sensorImageHeight", "value": "384"},
+                {"name": "sensorImageWidth", "value": "384"},
+                {
+                    "name": "sensorPixelSize",
+                    "value": {"height": "3.0e-10", "width": "3.0e-10"},
+                },
+            ]
+        }
+        mock_tiff_file.return_value.__enter__.return_value = mock_tiff
+
+        header = EERHeader.from_file("test.eer")
+
+        assert header.acquisition_id == "test_items_123"
+        assert header.camera_name == "ItemsCamera"
+        assert header.n_frames == 75
+        assert header.image_height_pixels == 384
+        assert header.image_width_pixels == 384
+        assert header.pixel_spacing_height_meters == 3.0e-10
+        assert header.pixel_spacing_width_meters == 3.0e-10
+
+    @patch("tifffile.TiffFile")
+    def test_eer_header_from_file_items_list_with_text(self, mock_tiff_file):
+        """Test parsing EER header with items list using 'text' field."""
+        # Mock TiffFile with items list using 'text' instead of 'value'
+        mock_tiff = Mock()
+        mock_tiff.eer_metadata = {
+            "item": [
+                {"name": "acquisitionID", "text": "test_text_123"},
+                {"name": "numberOfFrames", "text": "25"},
+                {"name": "sensorImageHeight", "text": "200"},
+                {"name": "sensorImageWidth", "text": "200"},
+            ]
+        }
+        mock_tiff_file.return_value.__enter__.return_value = mock_tiff
+
+        header = EERHeader.from_file("test.eer")
+
+        assert header.acquisition_id == "test_text_123"
+        assert header.n_frames == 25
+        assert header.image_height_pixels == 200
+        assert header.image_width_pixels == 200
+
+
+class TestBasicFunctionality:
+    """Test basic read and render functionality."""
 
     def create_mock_eer_header(self, n_frames=100, height=512, width=512):
         """Create a mock EER header for testing."""
