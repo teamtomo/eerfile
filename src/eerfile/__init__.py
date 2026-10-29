@@ -1,4 +1,4 @@
-"""Read electron event representation (EER) files in Python"""
+"""Read electron event representation (EER) files in Python."""
 
 from importlib.metadata import PackageNotFoundError, version
 
@@ -12,7 +12,4 @@ __email__ = "alisterburt@gmail.com"
 from .read_eer import read
 from .render_eer import render
 
-__all__ = [
-    "read",
-    "render"
-]
+__all__ = ["read", "render"]
