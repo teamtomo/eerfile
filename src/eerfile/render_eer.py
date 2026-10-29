@@ -5,7 +5,6 @@ import logging
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from math import floor
-from typing import Optional
 
 import numpy as np
 
@@ -16,9 +15,9 @@ from eerfile.read_eer import read_frames
 def render(
     file: os.PathLike,
     dose_per_output_frame: float,
-    total_fluence: Optional[float] = None,
-    chunk_size: Optional[int] = None,
-    max_workers: Optional[int] = None,
+    total_fluence: float | None = None,
+    chunk_size: int | None = None,
+    max_workers: int | None = None,
 ) -> np.ndarray:
     """
     Render EER files into a numpy array.
