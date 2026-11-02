@@ -1,7 +1,6 @@
 """Read EER files into a numpy array."""
 
 import os
-from typing import Optional
 
 import numpy as np
 from tifffile import TiffFile
@@ -27,7 +26,7 @@ def read(filename: os.PathLike) -> np.ndarray:
 
 
 def read_frames(
-    filename: os.PathLike, start_frame: int, end_frame: Optional[int] = None
+    filename: os.PathLike, start_frame: int, end_frame: int | None = None
 ) -> np.ndarray:
     """
     Read a specific range of frames from an EER file.
